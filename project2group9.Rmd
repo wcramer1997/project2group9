@@ -1,0 +1,69 @@
+---
+title: "Project 2"
+author: "Noah Gabriel"
+date: "11/7/2019"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+cards <- read_csv("cards.csv")
+sets <- read_csv("sets.csv")
+```
+```{r}
+master <- cards %>%
+select(
+  name,
+  convertedManaCost,
+  manaCost,
+  colors,
+  power,
+  toughness,
+  rarity,
+  type,
+  subtypes,
+  edhrecRank,
+  setCode
+      )
+setnames <- sets %>% rename(setCode = code)
+setnames <- setnames %>% select(releaseDate, setCode) #preparing the sets data for join
+master <- master %>%
+  inner_join(setnames, by = c("setCode" = "setCode")) #joining the 2 sets
+```
+```{r}
+master <- master %>% mutate(
+  year = year(releaseDate),
+  power = as.numeric(power, na.rm = TRUE),
+  toughness = as.numeric(power, na.rm = TRUE),
+  convertedManaCost = as.numeric(convertedManaCost, na.rm = TRUE)
+  #as.numeric changed the p and t
+)
+creatures <- master %>% filter(grepl("Creature",type))
+creatures %>% filter(year == 2019, rarity == "common") #checking
+```
+```{r}
+master <- master %>% filter(setCode != "UGL" & setCode != "UNH" & setCode != "UST") #filtering out all illegal sets
+```
+```{r}
+master %>% arrange(desc(power)) %>% select(name, power, setCode) #checking that they had been filtered out successfully
+```
+```{r}
+#dealing with nas in the color category
+master %>% arrange(desc(power)) %>% select(power, colors)
+```
+```{r}
+power_by_color <- creatures %>%
+filter(power > 0 & toughness > 0) %>% filter(colors == "B" | colors == "U" | colors == "G" | colors == "W" | colors == "R") %>% filter(rarity == "common") %>%
+# i filtered here bc otherwise you get combos such as "RG"
+group_by(year, colors) %>%
+summarise(average_power_ratio = mean(power) / mean(convertedManaCost))
+```
+```{r}
+library(tidyverse)
+library(ggthemes)
+power_graph <- ggplot(power_by_color) + geom_line(aes(x = year, y = average_power_ratio, color = colors), size = 2, alpha = .8)
+```
+```{r}
+power_graph + scale_color_manual(values = c("black", "green", "red", "blue", "white")) + theme_economist() #need to hide the key
+```
