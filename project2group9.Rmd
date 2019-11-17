@@ -5,9 +5,11 @@ date: "11/7/2019"
 output: html_document
 ---
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 ```
 ```{r}
+library(tidyverse)
+library(lubridate)
 cards <- read_csv("cards.csv")
 sets <- read_csv("sets.csv")
 ```
@@ -26,44 +28,192 @@ select(
   edhrecRank,
   setCode
       )
-setnames <- sets %>% rename(setCode = code)
-setnames <- setnames %>% select(releaseDate, setCode) #preparing the sets data for join
+setnames <- sets %>% rename(setCode = code) %>% select(releaseDate, setCode) #preparing the sets data for join
 master <- master %>%
-  inner_join(setnames, by = c("setCode" = "setCode")) #joining the 2 sets
+  inner_join(setnames, by = c("setCode" = "setCode")) #joining the 2 data sets
 ```
 ```{r}
 master <- master %>% mutate(
   year = year(releaseDate),
   power = as.numeric(power, na.rm = TRUE),
-  toughness = as.numeric(power, na.rm = TRUE),
+  toughness = as.numeric(toughness, na.rm = TRUE),
   convertedManaCost = as.numeric(convertedManaCost, na.rm = TRUE)
-  #as.numeric changed the p and t
+  #as.numeric changed the p and t so we could do calculations on them
 )
 creatures <- master %>% filter(grepl("Creature",type))
-creatures %>% filter(year == 2019, rarity == "common") #checking
+creatures %>% filter(year == 2019, rarity == "common") #checking tp make sure the grepl worked
 ```
 ```{r}
 master <- master %>% filter(setCode != "UGL" & setCode != "UNH" & setCode != "UST") #filtering out all illegal sets
+
+#master %>% arrange(desc(power)) %>% select(name, power, setCode, toughness) #checking that they had been filtered out successfully -- there would be a 99 power creature at the top if it had not been
 ```
 ```{r}
-master %>% arrange(desc(power)) %>% select(name, power, setCode) #checking that they had been filtered out successfully
-```
-```{r}
-#dealing with nas in the color category
-master %>% arrange(desc(power)) %>% select(power, colors)
-```
-```{r}
+#determining the average value per for common creatures defined as power + toughness / cmc
 power_by_color <- creatures %>%
-filter(power > 0 & toughness > 0) %>% filter(colors == "B" | colors == "U" | colors == "G" | colors == "W" | colors == "R") %>% filter(rarity == "common") %>%
-# i filtered here bc otherwise you get combos such as "RG"
+filter(power >= 0 & toughness > 0) %>% filter(colors == "B" | colors == "U" | colors == "G" | colors == "W" | colors == "R") %>% filter( year >= 2008) %>%
+# i filtered here bc otherwise you get combos such as "RG" and I chose 2008 bc it was the first introduction of mythic rares
 group_by(year, colors) %>%
-summarise(average_power_ratio = mean(power) / mean(convertedManaCost))
+summarise(average_power_ratio = (mean(power) + mean(toughness)) / mean(convertedManaCost))
 ```
 ```{r}
-library(tidyverse)
-library(ggthemes)
-power_graph <- ggplot(power_by_color) + geom_line(aes(x = year, y = average_power_ratio, color = colors), size = 2, alpha = .8)
+library(ggthemes) #loading before making our visualizations
+power_graph <- ggplot(power_by_color) +
+  geom_line(aes(
+    x = year, 
+    y = average_power_ratio, 
+    color = colors),
+    size = 1, 
+    alpha = .8)
+power_graph + scale_color_manual(values = c("black", "forestgreen", "red2", "dodgerblue", "lemonchiffon2")) +
+  theme_economist() +
+  theme(legend.position = "none") +
+  scale_x_continuous(breaks = c(2008,2010,2012,2014,2016,2018,2020)) +
+  xlab("Year of Release") +
+  ylab("(Power + Toughness) / CMC") +
+  theme(
+  panel.background = element_rect(fill = "lightblue",
+                                colour = "lightblue",
+                                size = 0.5, linetype = "solid"),
+  panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                colour = "white"),
+  panel.grid.minor = element_line(size = 0.25, linetype = 'solid',
+                                colour = "white") 
+  )
 ```
 ```{r}
-power_graph + scale_color_manual(values = c("black", "green", "red", "blue", "white")) + theme_economist() #need to hide the key
+# Visualizing rarity
+efficiency_rarity <- creatures %>%
+  filter(
+    name != "Phyrexian Dreadnaught" # this card costs 1 mana but is a 12/12 (it has a huge drawback)
+  ) %>%
+  filter(
+    power >= 0 & toughness > 0) %>%
+  group_by(
+    year, rarity) %>%
+  summarize(
+    efficiency = (mean(power) + mean(toughness)) / mean(convertedManaCost)) %>%
+  filter(
+    rarity != "mythic"
+  )
+rarity_graph <- ggplot(efficiency_rarity) + geom_line(aes(x = year, y = efficiency, color = rarity), size = 1, alpha = .7)
+rarity_graph + scale_color_manual(values = c("black", "goldenrod2", "azure4")) +
+  theme(
+  panel.background = element_rect(fill = "lightblue",
+                                colour = "lightblue",
+                                size = 0.5, linetype = "solid"),
+  panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                colour = "white"),
+  panel.grid.minor = element_line(size = 0.25, linetype = 'solid',
+                                colour = "white")) +
+  xlab("Year of Release") +
+  ylab("Efficiency by Rarity")
+```
+
+#throwaway section 
+```{r}
+OP_creature <- creatures %>%
+  filter(
+    rarity == "rare" & year == 1998
+  )
+  
+
+
+```
+
+# Creature types
+```{r}
+tribes <- creatures %>%
+  filter(
+    subtypes == "Zombie" | subtypes == "Human" | subtypes == "Goblin" | subtypes == "Beast" | subtypes == "Wurm"
+  ) %>%
+  mutate(
+    size = (power + toughness)
+  )
+tribes_size <- ggplot(tribes) +
+  geom_smooth(aes(x = year, y = size, color = subtypes), size = 1, alpha = .2, se = FALSE)
+tribes_size +
+  scale_color_manual(values = c("darkgreen", "red", "lemonchiffon2", "greenyellow", "black")) +
+  theme(
+  panel.background = element_rect(fill = "lightblue",
+                                colour = "lightblue",
+                                size = 0.5, linetype = "solid"),
+  panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                colour = "white"),
+  panel.grid.minor = element_line(size = 0.25, linetype = 'solid',
+                                colour = "white")) +
+  xlab("Year of Release") +
+  ylab("Size of Tribe Members")
+```
+# Mapping power-to-toughness for desired filtered group
+```{r}
+power_to_toughness <- creatures %>%
+distinct(name, .keep_all = TRUE) %>% # this is just filtering out reprints by only getting cards with a distinct name
+filter(
+  power >= 0 & power < 20 & toughness > 0) %>%
+  filter(power != 3.5 & power != 2.5) %>%
+  filter(power >= 0 & toughness > 0) %>% filter(colors == "B" | colors == "U" | colors == "G" | colors == "W" | colors == "R") %>%
+group_by(
+    power, toughness) %>%
+summarize(
+  num_cases = sum(n())
+)
+power_to_toughness_graph <- ggplot(power_to_toughness) +
+  geom_point(aes(
+    x = toughness,
+    y = power,
+    size = num_cases),
+    alpha = .5, color = "darkgreen") +
+  scale_x_continuous(breaks = c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16)) +
+  scale_y_continuous(breaks = c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16)) +
+  theme(
+  panel.background = element_rect(fill = "lightblue",
+                                colour = "lightblue",
+                                size = 0.5, linetype = "solid"),
+  panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                colour = "white"),
+  panel.grid.minor = element_line(size = 0.25, linetype = 'solid',
+                                colour = "white")) +
+  xlab("Toughness") +
+  ylab("Power") +
+  scale_size_continuous(range = c(.5,15))
+power_to_toughness_graph +
+  facet_grid(cols = vars(colors))
+```
+```{r}
+#what is going on here??? @Will Cramer
+creatures %>%
+  filter(
+    power == 0,
+    toughness == 8
+  )
+```
+```{r}
+power_to_toughness <- creatures %>%
+filter(
+  subtypes == "Zombie" | subtypes == "Goblin" | subtypes == "Beast") %>%
+group_by(
+    power, toughness, subtypes) %>%
+summarize(
+  num_cases = sum(n())
+)
+ggplot(power_to_toughness) +
+  geom_point(aes(
+    x = toughness,
+    y = power,
+    size = num_cases,
+    color = subtypes),
+    alpha = .5 ) +
+  scale_color_manual(values = c("forestgreen", "darkred", "black")) +
+  scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8)) +
+  scale_y_continuous(breaks = c(1,2,3,4,5,6,7,8)) +
+  theme(
+  panel.background = element_rect(fill = "lightblue",
+                                colour = "lightblue",
+                                size = 0.5, linetype = "solid"),
+  panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                colour = "white"),
+  panel.grid.minor = element_line(size = 0.25, linetype = 'solid',
+                                colour = "white")) +
+  facet_grid(cols = vars(subtypes))
 ```
