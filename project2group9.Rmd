@@ -31,8 +31,9 @@ select(
 setnames <- sets %>% rename(setCode = code) %>% select(releaseDate, setCode) #preparing the sets data for join
 master <- master %>%
   inner_join(setnames, by = c("setCode" = "setCode")) #joining the 2 data sets
-```
-```{r}
+
+master <- master %>% filter(setCode != "UGL" & setCode != "UNH" & setCode != "UST") #filtering out all illegal sets
+
 master <- master %>% mutate(
   year = year(releaseDate),
   power = as.numeric(power, na.rm = TRUE),
@@ -40,11 +41,13 @@ master <- master %>% mutate(
   convertedManaCost = as.numeric(convertedManaCost, na.rm = TRUE)
   #as.numeric changed the p and t so we could do calculations on them
 )
+```
+
+```{r}
+## Creating creatures dataframe
 creatures <- master %>% filter(grepl("Creature",type))
 creatures %>% filter(year == 2019, rarity == "common") #checking tp make sure the grepl worked
-```
-```{r}
-master <- master %>% filter(setCode != "UGL" & setCode != "UNH" & setCode != "UST") #filtering out all illegal sets
+
 
 #master %>% arrange(desc(power)) %>% select(name, power, setCode, toughness) #checking that they had been filtered out successfully -- there would be a 99 power creature at the top if it had not been
 ```
@@ -89,6 +92,8 @@ efficiency_rarity <- creatures %>%
   ) %>%
   filter(
     power >= 0 & toughness > 0) %>%
+  filter(
+    year > 2007) %>%
   group_by(
     year, rarity) %>%
   summarize(
@@ -110,22 +115,11 @@ rarity_graph + scale_color_manual(values = c("black", "goldenrod2", "azure4")) +
   ylab("Efficiency by Rarity")
 ```
 
-#throwaway section 
-```{r}
-OP_creature <- creatures %>%
-  filter(
-    rarity == "rare" & year == 1998
-  )
-  
-
-
-```
-
 # Creature types
 ```{r}
 tribes <- creatures %>%
   filter(
-    subtypes == "Zombie" | subtypes == "Human" | subtypes == "Goblin" | subtypes == "Beast" | subtypes == "Wurm"
+    subtypes == "Zombie" | subtypes == "Human" | subtypes == "Goblin" | subtypes == "Beast" | subtypes == "Wurm" | subtypes == "Angel" | subtypes == "Leviathan"
   ) %>%
   mutate(
     size = (power + toughness)
@@ -133,7 +127,7 @@ tribes <- creatures %>%
 tribes_size <- ggplot(tribes) +
   geom_smooth(aes(x = year, y = size, color = subtypes), size = 1, alpha = .2, se = FALSE)
 tribes_size +
-  scale_color_manual(values = c("darkgreen", "red", "lemonchiffon2", "greenyellow", "black")) +
+  scale_color_manual(values = c("orchid2", "darkgreen", "red", "lemonchiffon2", "royalblue4",  "greenyellow", "black")) +
   theme(
   panel.background = element_rect(fill = "lightblue",
                                 colour = "lightblue",
@@ -145,6 +139,7 @@ tribes_size +
   xlab("Year of Release") +
   ylab("Size of Tribe Members")
 ```
+
 # Mapping power-to-toughness for desired filtered group
 ```{r}
 power_to_toughness <- creatures %>%
@@ -177,36 +172,31 @@ power_to_toughness_graph <- ggplot(power_to_toughness) +
   xlab("Toughness") +
   ylab("Power") +
   scale_size_continuous(range = c(.5,15))
-power_to_toughness_graph +
-  facet_grid(cols = vars(colors))
+
+power_to_toughness_graph
 ```
+
+
 ```{r}
-#what is going on here??? @Will Cramer
-creatures %>%
-  filter(
-    power == 0,
-    toughness == 8
-  )
-```
-```{r}
-power_to_toughness <- creatures %>%
+power_to_toughness_by_tribe <- creatures %>%
 filter(
-  subtypes == "Zombie" | subtypes == "Goblin" | subtypes == "Beast") %>%
+  subtypes == "Zombie" | subtypes == "Goblin" | subtypes == "Beast" | subtypes == "Wall") %>%
 group_by(
     power, toughness, subtypes) %>%
 summarize(
   num_cases = sum(n())
-)
-ggplot(power_to_toughness) +
+          ) 
+
+ggplot(power_to_toughness_by_tribe) +
   geom_point(aes(
     x = toughness,
     y = power,
     size = num_cases,
     color = subtypes),
     alpha = .5 ) +
-  scale_color_manual(values = c("forestgreen", "darkred", "black")) +
-  scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8)) +
-  scale_y_continuous(breaks = c(1,2,3,4,5,6,7,8)) +
+  scale_color_manual(values = c("forestgreen", "darkred", "tan4", "black")) +
+  scale_x_continuous(breaks = c(1,2,3,4,5,6,7,8,9,10)) +
+  scale_y_continuous(breaks = c(1,2,3,4,5,6,7,8,9,10)) +
   theme(
   panel.background = element_rect(fill = "lightblue",
                                 colour = "lightblue",
@@ -215,5 +205,44 @@ ggplot(power_to_toughness) +
                                 colour = "white"),
   panel.grid.minor = element_line(size = 0.25, linetype = 'solid',
                                 colour = "white")) +
-  facet_grid(cols = vars(subtypes))
+  facet_wrap(~subtypes, nrow = 2, ncol = 2)
 ```
+
+
+
+
+# throwaway 
+```{r}
+creatures %>%
+  group_by(subtypes) %>%
+  summarize(
+    num_creatures = sum(n())
+  ) %>%
+  arrange(desc(num_creatures))
+
+
+humans_by_occupation <- creatures %>% 
+  filter(
+    grepl("Human", subtypes) 
+  ) 
+
+
+%>%
+  rename(
+    Wizard = `Human, Wizard`,				
+    Soldier = `Human, Soldier`,				
+    Knight = `Human, Knight`,				
+    Cleric = `Human, Cleric`,		
+    Warrior = `Human, Warrior`,			
+    Shaman = `Human, Shaman`,			
+    Rogue = `Human, Rogue`,
+    Druid = `Human, Druid` 
+          ) %>%
+  group_by(
+    subtypes
+  ) %>%
+  summarize(
+    occupations = sum(n())) %>%
+  arrange(desc(occupations)) 
+```
+
