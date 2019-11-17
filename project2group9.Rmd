@@ -117,17 +117,24 @@ rarity_graph + scale_color_manual(values = c("black", "goldenrod2", "azure4")) +
 
 # Creature types
 ```{r}
+# note: we have to use grepl here to get creatures like Human Shaman to count as a Human
 tribes <- creatures %>%
   filter(
-    subtypes == "Zombie" | subtypes == "Human" | subtypes == "Goblin" | subtypes == "Beast" | subtypes == "Wurm" | subtypes == "Angel" | subtypes == "Leviathan"
+    subtypes == "Zombie" | subtypes == "Human" | subtypes == "Goblin" | subtypes == "Beast" | subtypes == "Wurm" | subtypes == "Angel" | subtypes == "Wizard" | subtypes == "Merfolk" | subtypes == "Demon" | subtypes == "Dragon"
   ) %>%
-  mutate(
-    size = (power + toughness)
-  )
-tribes_size <- ggplot(tribes) +
-  geom_smooth(aes(x = year, y = size, color = subtypes), size = 1, alpha = .2, se = FALSE)
-tribes_size +
-  scale_color_manual(values = c("orchid2", "darkgreen", "red", "lemonchiffon2", "royalblue4",  "greenyellow", "black")) +
+    filter(
+    power >= 0 & toughness > 0) %>%
+  group_by(subtypes) %>%
+  summarize(
+    mean_size = (mean(power) + mean(toughness))
+    )
+
+tribes_graph <- tribes %>%
+ggplot(aes(x=subtypes, y = mean_size, fill = subtypes)) +
+  geom_bar(stat = "identity", color = 'black') 
+
+tribes_graph +
+  scale_fill_manual(values = c("white", "darkgreen", "black", "red", "red", "white", "darkblue", "darkblue", "darkgreen", "black")) +
   theme(
   panel.background = element_rect(fill = "lightblue",
                                 colour = "lightblue",
@@ -136,8 +143,17 @@ tribes_size +
                                 colour = "white"),
   panel.grid.minor = element_line(size = 0.25, linetype = 'solid',
                                 colour = "white")) +
-  xlab("Year of Release") +
-  ylab("Size of Tribe Members")
+  ylab("Size of Tribe Members") +
+  xlab("Creature Subtype")
+
+creatures %>%
+  filter(
+    subtypes == "Wizard"
+  ) %>%
+  arrange(
+    desc(power)
+  )
+
 ```
 
 # Mapping power-to-toughness for desired filtered group
