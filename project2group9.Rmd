@@ -9,6 +9,7 @@ knitr::opts_chunk$set(echo = FALSE)
 ```
 ```{r}
 # Loading pre-recs 
+# need to figure out how to suppress this 
 library(tidyverse)
 library(lubridate)
 library(ggthemes) 
@@ -114,7 +115,8 @@ distinct(name, .keep_all = TRUE) %>% # this is just filtering out reprints by on
 filter(
   power >= 0 & power < 20 & toughness > 0) %>%
   filter(power != 3.5 & power != 2.5) %>%
-  filter(power >= 0 & toughness > 0) %>% filter(colors == "B" | colors == "U" | colors == "G" | colors == "W" | colors == "R") %>%
+  filter(power >= 0 & toughness > 0) %>% 
+  filter(colors == "B" | colors == "U" | colors == "G" | colors == "W" | colors == "R") %>%
 group_by(
     power, toughness) %>%
 summarize(
@@ -125,7 +127,8 @@ power_to_toughness_graph <- ggplot(power_to_toughness) +
     x = toughness,
     y = power,
     size = num_cases),
-    alpha = .7, color = "grey") +
+    alpha = .7, 
+    color = "black") +
   scale_x_continuous(breaks = c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16)) +
   scale_y_continuous(breaks = c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16)) +
   theme(
@@ -183,6 +186,8 @@ power_to_toughness_by_tribe_graph
 ```
 
 
+While many creatures fall into specific tribes that commonly occur throughout the MTG multiverse, nearly as many do not. As a result, we must also look beyond tribe and at what is perhaps Magic's hallmark category breakdown: color. As mentioned above, colors have different assocations and their creatures help embody that notion. While green, the color of primieval beasts and monstrosities, has nearly always boasted more powerful creatures than any of its fellows and thus retained top-dog status, the hierarchy between the other four colors is less clear. What is obvious, however, is the data-backed notion of "power-creep," or the steady ascent of power levels over time, as can be seen clearly in this graphic, especially in the last five years.
+
 ```{r}
 ## Power Creep
 power_graph <- ggplot(power_by_color) +
@@ -209,8 +214,10 @@ power_graph + scale_color_manual(values = c("black", "forestgreen", "red2", "dod
   )
 ```
 
-## Power Creep Pt. 2: Rarity 
+This notion becomes especially clear when examined through the lens of rarity. Wizards of the Coast prints most of its cards in what are called "booster packs," containing 10 "commons," 3 "uncommons" and one "rare." Commons are designed to be simpler and less powerful, serving as a baseline against which other cards are measured. 
+
 ```{r}
+## Power Creep Pt. 2: Rarity 
 efficiency_rarity <- creatures %>%
   filter(
     name != "Phyrexian Dreadnaught" # this card costs 1 mana but is a 12/12 (it has a huge drawback)
@@ -218,7 +225,7 @@ efficiency_rarity <- creatures %>%
   filter(
     power >= 0 & toughness > 0) %>%
   filter(
-    year > 2007) %>%
+    year >= 2008) %>%
   group_by(
     year, rarity) %>%
   summarize(
@@ -226,8 +233,18 @@ efficiency_rarity <- creatures %>%
   filter(
     rarity != "mythic"
   )
-rarity_graph <- ggplot(efficiency_rarity) + geom_line(aes(x = year, y = efficiency, color = rarity), size = 1, alpha = .7)
-rarity_graph + scale_color_manual(values = c("black", "goldenrod2", "azure4")) +
+
+rarity_graph <- ggplot(efficiency_rarity) + 
+  geom_line(aes(
+    x = year, 
+    y = efficiency, 
+    color = rarity), 
+    size = 1, 
+    alpha = .7)
+
+rarity_graph <- rarity_graph + 
+  scale_color_manual(values = c("black", "goldenrod2", "azure4")) +
+  scale_x_continuous(breaks = c(2008,2010,2012,2014,2016,2018,2020)) +
   theme(
   panel.background = element_rect(fill = "lightblue",
                                 colour = "lightblue",
@@ -238,11 +255,24 @@ rarity_graph + scale_color_manual(values = c("black", "goldenrod2", "azure4")) +
                                 colour = "white")) +
   xlab("Year of Release") +
   ylab("Efficiency by Rarity")
+
+rarity_graph
 ```
 
-### throwaway scratchwork section 
-```{r}
+The trends across rarity mirror each other, keeping that gap of power levels the same. 
 
+
+
+
+
+
+
+
+
+
+
+
+### throwaway scratchwork section 
 creatures %>% # this shows we need to grepl
   filter(
     subtypes == "Wizard"
@@ -283,4 +313,3 @@ humans_by_occupation <- creatures %>%
   summarize(
     occupations = sum(n())) %>%
   arrange(desc(occupations)) 
-```
